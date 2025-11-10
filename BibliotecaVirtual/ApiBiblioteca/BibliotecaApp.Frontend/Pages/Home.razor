@@ -1,0 +1,199 @@
+﻿@page "/"
+@using Biblioteca.Domain.DTOs
+@using BibliotecaApp.Frontend.Services
+
+@inject IEditorialService EditorialService
+
+<PageTitle>Biblioteca</PageTitle>
+
+<h1 class="mb-4">Gestion de Editoriales</h1>
+
+<EditForm Model="@newEditorial" OnValidSubmit="CreateEditorialAsync" class="border rounded p-4 mb-4 bg-light">
+	<DataAnnotationsValidator />
+	<ValidationSummary />
+
+	<div class="form-group mb-2">
+		<label>Nombre de la Editorial:</label>
+		<input @bind-value="newEditorial.Nombre" type="text" class="form-control" />
+	</div>
+	<div class="form-group mb-2">
+		<label>Pais de la Editorial:</label>
+		<input @bind-value="newEditorial.Pais" type="text" class="form-control" />
+	</div>
+	<h4 class="mt-3">Libros</h4>
+	@foreach (var libro in newEditorial.Libros)
+	{
+		<div class="form-row align-items-center mb-2">
+			<div class="col">
+				<label>Titulo:</label>
+				<input @bind-value="libro.Titulo" type="text" class="form-control" />
+			</div>
+			<div class="col">
+				<label>Autor:</label>
+				<input @bind-value="libro.Autor" type="text" class="form-control" />
+			</div>
+			<div class="col">
+				<label>Año de publicacion:</label>
+				<input @bind-value="libro.AnioPublicacion" type="number" class="form-control" />
+			</div>
+			<div class="col">
+				<label>Género:</label>
+				<select class="form-control" @bind="libro.Genero">
+					<option disabled selected value="">Seleccione un género</option>
+					<option value="0">NARRATIVO</option>
+					<option value="1">LIRICO</option>
+					<option value="2">DRAMATICO</option>
+					<option value="3">DIDACTICO</option>
+					<option value="4">CIENTIFICO</option>
+					<option value="5">INFANTIL</option>
+					<option value="6">OTRO</option>
+				</select>
+			</div>
+
+			<div class="col-auto mt-4">
+				<button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveLibro(libro)">Eliminar</button>
+			</div>
+		</div>
+	}
+	<button type="button" class="btn btn-secondary btn-sm mb-3" @onclick="AddLibro">Agregar Libro</button>
+	<br />
+	<button type="submit" class="btn btn-primary mt-2">Crear Editorial</button>
+
+</EditForm>
+@if (!string.IsNullOrEmpty(createEditorialMessage))
+{
+	<div class="alert alert-info mt-2">@createEditorialMessage</div>
+}
+<hr />
+<!-- Buscar Editorial por ID -->
+<h4>Buscar Editorial</h4>
+<div class="form-inline mb-3">
+	<label>Ingrese el ID de la Editorial:</label>
+	<input @bind-value="searchEditorialId" type="number" class="form-control mr-2" />
+	<button type="button" class="btn btn-info" @onclick="SearchEditorialAsync">Buscar</button>
+</div>
+@if (searchedEditorial != null)
+{
+	<div class="card mb-3">
+		<div class="card-body">
+			<h5 class="card-title">@searchedEditorial.Nombre (ID: @searchedEditorial.Id)</h5>
+			<p class="card-text">Pais: @searchedEditorial.Pais</p>
+			<h6>Libros:</h6>
+			<ul>
+				@foreach (var libro in searchedEditorial.Libros)
+				{
+					<li>@libro.Titulo por @libro.Autor (@libro.AnioPublicacion) - Genero: @libro.Genero</li>
+				}
+			</ul>
+		</div>
+	</div>
+}
+else if (searchEditorialId > 0 && searchEditorialError != null)
+{
+	<div class="alert alert-danger">@searchEditorialError</div>
+}
+<hr />
+<!-- Listar todas las Editoriales -->
+<h4>Lista de Editoriales</h4>
+<button class="btn btn-success mb-2" @onclick="LoadEditorialesAsync">Actualizar Lista</button>
+@if (editoriales == null)
+{
+	<p>Cargando...</p>
+}
+else if (!editoriales.Any())
+{
+	<p>No hay editoriales registradas.</p>
+}
+else
+{
+	<table class="table table-striped table-bordered">
+		<thead class="thead-dark">
+			<tr>
+				<th>ID</th>
+				<th>Nombre</th>
+				<th>Pais</th>
+				<th>Fecha de Registro</th>
+				<th>Cantidad Libros</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var editorial in editoriales)
+			{
+				<tr>
+					<td>@editorial.Id</td>
+					<td>@editorial.Nombre</td>
+					<td>@editorial.Pais</td>
+					<td>@editorial.FechaRegistro</td>
+					<td>@editorial.CantidadLibros</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+
+@code {
+	private CreateEditorialDto newEditorial = new()
+	{
+		Libros = new List<CreateEditorialLibroDto>()
+	};
+	private string? createEditorialMessage;
+	private int searchEditorialId;
+	private EditorialResponseDto? searchedEditorial;
+	private string? searchEditorialError;
+	private List<EditorialResponseDto>? editoriales;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadEditorialesAsync();
+	}
+
+	private async Task LoadEditorialesAsync()
+	{
+		var url = "api/Editoriales";
+		editoriales = (await EditorialService.GetAllEditorialsAsync<List<EditorialResponseDto>>(url));
+	}
+
+	private void AddLibro()
+	{
+		newEditorial.Libros.Add(new CreateEditorialLibroDto());
+	}
+
+	private void RemoveLibro(CreateEditorialLibroDto libro)
+	{
+		newEditorial.Libros.Remove(libro);
+	}
+
+	private async Task CreateEditorialAsync()
+	{
+		try
+		{
+			var url = "api/Editoriales";
+			var result = await EditorialService.CreateEditorialAsync(url, newEditorial);
+			createEditorialMessage = "Editorial creado exitosamente!";
+			newEditorial = new CreateEditorialDto
+			{
+				Libros = new List<CreateEditorialLibroDto>()
+			};
+			await LoadEditorialesAsync();
+		}
+		catch (Exception ex)
+		{
+			createEditorialMessage = $"Error: {ex.Message}";
+		}
+	}
+
+	private async Task SearchEditorialAsync()
+	{
+		searchEditorialError = null;
+		searchedEditorial = null;
+		try
+		{
+			var url = "api/Editoriales";
+			searchedEditorial = await EditorialService.GetEditorialByIdAsync<EditorialResponseDto>(url, searchEditorialId);
+		}
+		catch (Exception ex)
+		{
+			searchEditorialError = ex.Message;
+		}
+	}
+}
